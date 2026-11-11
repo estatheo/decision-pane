@@ -52,6 +52,37 @@ node tests/panel-ui.cjs  # optional UI regression check; Node 18+
 gc lint gascity
 ```
 
+## Terminal panel beside Codex
+
+On macOS or Linux, the terminal panel uses Python's standard-library `curses`
+and the same city beads and delivery code as the browser panel:
+
+```bash
+python3 gascity/lib/terminal.py --city /absolute/path/to/your-city
+```
+
+Inside a tmux session, run this from your Codex pane to add a 58-column panel
+on the right while keeping focus in Codex. Replace both paths with your checkout
+and city paths:
+
+```bash
+tmux split-window -h -d -l 58 'python3 -I /path/to/decision-pane/gascity/lib/terminal.py --city /path/to/city'
+```
+
+With tmux's default prefix, `Ctrl-b` then `o` switches panes. In the panel,
+`1`–`9` chooses, `e` starts a custom answer, `d` asks to discuss first, and `l`
+defers a decision. While editing, all printable keys become answer text;
+Enter sends and Escape leaves editing. Polling preserves unfinished answers.
+Use `j`/`k` or arrows to scroll, `w` to show finished work, `r` to refresh or
+retry saved delivery, and `q` to exit the panel. Sending disables further
+submissions and waits for delivery before accepting `q`. The panel scrolls to
+fit narrow or short panes and requires at least 20 columns by 8 rows.
+
+Once your pinned pack includes this version, `gc decisions terminal` also works.
+This runs a separate terminal process beside Codex; it does not modify Codex,
+start a model, restart the city, or change global tmux settings. The browser
+panel can stay open as a view; use one interface at a time to answer a decision.
+
 ## Claude Code pane
 
 Stop answering Claude's questions in the chat. With this mod, Claude puts every choice it needs from you in a panel beside the chat and keeps working. You answer with one keypress when you are ready, and the answer goes straight back to Claude.
