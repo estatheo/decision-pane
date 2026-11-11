@@ -1,0 +1,11 @@
+{
+  "name": "decisions",
+  "version": "0.1.0",
+  "description": "A Decisions panel for Claude Code: Claude posts the choices it needs from you as one-keypress questions, keeps working, and gets each answer back as a message. Plus a Work of the day list with progress bars.",
+  "author": { "name": "estatheo", "url": "https://github.com/estatheo" },
+  "homepage": "https://github.com/estatheo/claude-decisions",
+  "repository": "https://github.com/estatheo/claude-decisions",
+  "license": "MIT",
+  "keywords": ["claude-code", "mod", "panel", "decisions", "human-in-the-loop", "todo", "progress", "agents"],
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "estatheo",
+  "owner": { "name": "estatheo", "url": "https://github.com/estatheo" },
+  "plugins": [
+    {
+      "name": "decisions",
+      "source": "./",
+      "description": "A Decisions panel and a Work of the day list beside the Claude Code chat."
+    }
+  ]
+}
