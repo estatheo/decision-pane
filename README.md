@@ -84,10 +84,10 @@ Three steps, run once per city:
 
 ```bash
 cd /path/to/your-city
-gc import add https://github.com/estatheo/claude-decisions/tree/main/gascity
+gc import add https://github.com/estatheo/claude-decisions/tree/main/gascity --name decisions
 ```
 
-That adds `gc decisions ask`, `work`, `list` and `withdraw`. They need `python3` on the machine.
+That adds `gc decisions ask`, `work`, `list` and `withdraw` (`--name` sets the `decisions` in those commands). They need `python3` on the machine.
 
 **2. Tell every agent to use them.** Add the pack's prompt fragment to `city.toml`:
 
