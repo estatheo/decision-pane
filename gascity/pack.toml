@@ -1,6 +1,6 @@
 # Decisions panel pack: lets agents on any model (Claude, GPT/Codex, others)
-# post decisions and work items to the human's Decisions panel through the
-# city's beads. Import it, then add "decisions" to global_fragments.
+# post decisions and work items through city beads. View them with the local
+# browser panel or Claude Code pane. Import it and append the decisions fragment.
 [pack]
 name = "decisions"
 schema = 2

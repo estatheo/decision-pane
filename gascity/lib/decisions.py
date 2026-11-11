@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Decisions and Work of the day for Gas City agents on any model.
 
-Writes to the city's beads, where the Decisions panel (the Claude Code mod in
-this repository, with its store set to "beads") reads them. Standard library only.
+Writes to city beads, shared by the local browser panel and the Claude Code
+mod in this repository (with its store set to "beads"). Standard library only.
 
   gc decisions ask "Question?" --option "Label :: what happens" --option "Other" [--context ..] [--recommend 1]
   gc decisions work KEY [--title ..] [--status todo|running|waiting|review|blocked|done|dropped] [--note ..]

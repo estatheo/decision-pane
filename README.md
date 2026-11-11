@@ -1,4 +1,58 @@
-# Decisions panel for Claude Code
+# Decisions panel for Gas City and Claude Code
+
+**Using Codex?** Run the local browser panel below. It uses the same Gas City
+decisions and work list as the Claude Code pane, without starting another model.
+The docked `/decisions` pane remains a Claude Code integration; the browser panel
+does not add a native sidebar inside Codex.
+
+## Local panel for Codex and other agents
+
+Requires Python 3.9+ and Gas City (`gc`) on your PATH. From a checkout of this
+repository, run:
+
+```bash
+python3 gascity/lib/panel.py --city /absolute/path/to/your-city
+```
+
+It prints a localhost URL and opens your browser. Keep that process running;
+Ctrl-C stops it. Use `--no-open` to print the URL only, or `--port 8765` for a
+fixed port. No Python packages, API key, paid service or model session is needed.
+
+When the city's pinned decisions pack includes this version, you can also run
+`gc decisions panel` from inside the city. Existing pins must be updated through
+your normal pack upgrade process; do not edit Gas City's imported cache.
+
+The panel shows pending decisions, recommendations, option details, a custom
+answer field, **Discuss first**, **Later**, and grouped work progress. Keys
+`1`–`9`, `D` and `L` work when focus is outside a form control. It refreshes every
+eight seconds while visible and preserves an answer being typed. Later only
+changes this browser tab's queue; it does not answer or withdraw anything.
+
+Answers are saved to the original bead and sent to its `reply_to` agent through
+`gc mail send --notify`. If delivery fails, the saved choice stays visible with
+**Retry delivery**. A saved answer cannot be replaced with another choice.
+Repeat submissions skip already delivered answers; retries also use Gas City's
+mail deduplication key (best effort if the configured mail provider lacks dedup
+support). Decisions created only for a Claude session need a `reply_to` recipient
+before the browser panel can deliver them. Use one answering interface per city
+at a time; simultaneous submissions from the Claude pane and browser are not an
+atomic cross-client operation.
+
+The server binds only to `127.0.0.1`, checks Host/Origin, and requires a per-run
+token for answers. It does not expose a shell or an arbitrary command endpoint.
+Do not expose it through a tunnel or reverse proxy. This is a local interface,
+not a multi-user hosted service. If Gas City is unavailable, the last view stays
+on screen with an error; no empty successful state is substituted.
+
+To check the browser panel and its answer-delivery contract:
+
+```bash
+python3 -m unittest discover -s tests -v
+node tests/panel-ui.cjs  # optional UI regression check; Node 18+
+gc lint gascity
+```
+
+## Claude Code pane
 
 Stop answering Claude's questions in the chat. With this mod, Claude puts every choice it needs from you in a panel beside the chat and keeps working. You answer with one keypress when you are ready, and the answer goes straight back to Claude.
 
@@ -102,7 +156,7 @@ global_fragments = ["decisions"]   # keep your existing entries in the list
 { "pluginConfigs": { "decisions@estatheo": { "options": { "store": "beads" } } } }
 ```
 
-Start that session inside the city folder so `gc` finds the city. If `gc` is not on your `PATH`, set `gcPath` too. If the city has no Claude Code session at all, you can still answer from the command line with `gc decisions list` and `gc bd`; the panel itself needs Claude Code.
+Start that session inside the city folder so `gc` finds the city. If `gc` is not on your `PATH`, set `gcPath` too. If the city has no Claude Code session, use the local browser panel above. The docked terminal pane itself needs Claude Code.
 
 What agents run:
 

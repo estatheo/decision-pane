@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="decision-token" content="__TOKEN__" />
+    <title>Decisions · Gas City</title>
+    <style nonce="__NONCE__">
+      :root {
+        color-scheme: light;
+        --ink: #202833;
+        --muted: #647080;
+        --line: #dfe4e8;
+        --accent: #5043a5;
+        --paper: #fff;
+        --bg: #f4f5f7;
+        font:
+          15px/1.5 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.55;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #9c8de0;
+        outline-offset: 3px;
+      }
+      button {
+        border: 1px solid var(--line);
+        background: white;
+        color: var(--ink);
+        border-radius: 9px;
+        padding: 10px 14px;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      header {
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        padding: 22px max(24px, calc((100vw - 1180px) / 2));
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      h1 {
+        font-size: 22px;
+        letter-spacing: -0.7px;
+        margin: 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        background: #ece9f8;
+        color: var(--accent);
+        font-size: 22px;
+      }
+      .subtitle {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .connection {
+        font-size: 12px;
+        color: var(--muted);
+        text-align: right;
+      }
+      .connection strong {
+        display: block;
+        color: #367260;
+        font-weight: 600;
+      }
+      main {
+        max-width: 1228px;
+        margin: 32px auto;
+        padding: 0 24px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: 26px;
+        align-items: start;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .count {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 400;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 26px;
+        box-shadow: 0 3px 12px #20283303;
+      }
+      .eyebrow {
+        font:
+          12px ui-monospace,
+          monospace;
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+      .question {
+        text-transform: none;
+        color: var(--ink);
+        font-size: 25px;
+        line-height: 1.3;
+        letter-spacing: -0.6px;
+        margin: 0 0 16px;
+        overflow-wrap: anywhere;
+      }
+      .context {
+        white-space: pre-wrap;
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0 0 24px;
+        overflow-wrap: anywhere;
+      }
+      .options {
+        display: grid;
+        gap: 10px;
+      }
+      .option {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        text-align: left;
+        width: 100%;
+        padding: 15px;
+      }
+      .key {
+        flex: none;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        min-width: 25px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        padding: 2px;
+      }
+      .option.recommended {
+        border-color: #b5abd9;
+        background: #faf9ff;
+      }
+      .option strong {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .detail {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 3px;
+        overflow-wrap: anywhere;
+      }
+      .tag {
+        display: inline-block;
+        color: var(--accent);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-left: 7px;
+      }
+      .custom {
+        margin-top: 22px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+      }
+      label {
+        font-size: 13px;
+        display: block;
+        margin-bottom: 7px;
+      }
+      .input-row {
+        display: flex;
+        gap: 8px;
+      }
+      input {
+        min-width: 0;
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: white;
+        color: var(--ink);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .quiet {
+        border: 0;
+        background: transparent;
+        padding: 7px 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .primary {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+      .empty {
+        text-align: center;
+        padding: 42px 15px;
+        color: var(--muted);
+      }
+      .empty strong {
+        display: block;
+        font-size: 18px;
+        color: var(--ink);
+        margin-bottom: 8px;
+      }
+      .summary {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .summary strong {
+        font-size: 27px;
+        letter-spacing: -0.7px;
+      }
+      .summary span {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      progress {
+        display: block;
+        width: 100%;
+        height: 7px;
+        accent-color: var(--accent);
+        margin-bottom: 23px;
+      }
+      h3 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--muted);
+        margin: 23px 0 8px;
+      }
+      .work-row {
+        padding: 14px 0;
+        border-bottom: 1px solid #edf0f3;
+        display: grid;
+        grid-template-columns: 8px minmax(0, 1fr);
+        gap: 12px;
+      }
+      .dot {
+        height: 7px;
+        width: 7px;
+        border-radius: 50%;
+        margin-top: 8px;
+        background: #929ba6;
+      }
+      .dot.running {
+        background: #4385a9;
+      }
+      .dot.waiting {
+        background: #b98932;
+      }
+      .dot.blocked {
+        background: #bc5961;
+      }
+      .dot.review {
+        background: #8061ad;
+      }
+      .dot.done {
+        background: #4c9276;
+      }
+      .work-title {
+        font-size: 14px;
+        font-weight: 550;
+        overflow-wrap: anywhere;
+      }
+      .work-meta {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 3px;
+      }
+      .work-meta code {
+        font-size: 11px;
+      }
+      .work-note {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 5px;
+        overflow-wrap: anywhere;
+      }
+      .help {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 17px 4px;
+        line-height: 1.7;
+      }
+      .help kbd {
+        font:
+          11px ui-monospace,
+          monospace;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        padding: 1px 4px;
+        background: white;
+      }
+      .error {
+        max-width: 1180px;
+        margin: 20px auto 0;
+        padding: 13px 18px;
+        background: #fff0ee;
+        border: 1px solid #eac1bb;
+        border-radius: 9px;
+        color: #853d36;
+        font-size: 14px;
+        white-space: pre-wrap;
+      }
+      .error:empty {
+        display: none;
+      }
+      details {
+        margin-top: 22px;
+      }
+      summary {
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      footer {
+        max-width: 1228px;
+        padding: 0 24px 28px;
+        margin: auto;
+        font-size: 11px;
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .saved {
+        background: #fff8e9;
+        padding: 15px;
+        border-radius: 9px;
+        margin-bottom: 16px;
+        font-size: 13px;
+      }
+      .saved button {
+        margin-top: 10px;
+        display: block;
+      }
+      @media (max-width: 760px) {
+        header {
+          padding: 18px 20px;
+        }
+        .connection {
+          max-width: 120px;
+        }
+        main {
+          grid-template-columns: 1fr;
+          margin-top: 24px;
+          padding: 0 16px;
+          gap: 22px;
+        }
+        .card {
+          padding: 21px;
+        }
+        .question {
+          text-transform: none;
+          color: var(--ink);
+          font-size: 22px;
+        }
+        .error {
+          margin: 16px;
+        }
+        .subtitle {
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <div class="mark" aria-hidden="true">↗</div>
+        <div>
+          <h1>Decisions</h1>
+          <div class="subtitle">Your Gas City, at a glance</div>
+        </div>
+      </div>
+      <div class="connection">
+        <strong id="connection">Connecting…</strong
+        ><span id="updated">Local to this machine</span>
+      </div>
+    </header>
+    <div id="error" class="error" role="alert"></div>
+    <main>
+      <section aria-labelledby="decision-heading">
+        <div class="section-head">
+          <h2 id="decision-heading">
+            Needs your input <span id="decision-count" class="count"></span>
+          </h2>
+          <button id="refresh" class="quiet">Refresh</button>
+        </div>
+        <div id="decisions" class="card" aria-live="polite">
+          <div class="empty">Loading decisions…</div>
+        </div>
+        <div class="help">
+          Choose with <kbd>1</kbd>–<kbd>9</kbd> · <kbd>D</kbd> discuss ·
+          <kbd>L</kbd> later<br />Your answer goes directly to the agent that
+          asked.
+        </div>
+      </section>
+      <section aria-labelledby="work-heading">
+        <div class="section-head">
+          <h2 id="work-heading">Work of the day</h2>
+          <span class="count" id="work-count"></span>
+        </div>
+        <div id="work" class="card"><div class="empty">Loading work…</div></div>
+      </section>
+    </main>
+    <footer id="city">
+      Gas City · shared decisions and work · no model required to run this panel
+    </footer>
+    <script nonce="__NONCE__">
+      const $ = (id) => document.getElementById(id),
+        token = document.querySelector('meta[name="decision-token"]').content;
+      let state = null,
+        current = null,
+        busy = false,
+        loading = false,
+        decisionSignature = "",
+        workSignature = "",
+        later = [];
+      try {
+        later = JSON.parse(sessionStorage.getItem("later") || "[]");
+        if (!Array.isArray(later)) later = [];
+      } catch {}
+      const labels = {
+        todo: "To do",
+        running: "Working",
+        waiting: "Waiting",
+        review: "Ready for review",
+        blocked: "Blocked",
+        done: "Done",
+        dropped: "Dropped",
+      };
+      const rank = {
+        running: 0,
+        review: 1,
+        waiting: 2,
+        blocked: 3,
+        todo: 4,
+        done: 5,
+        dropped: 6,
+      };
+      function el(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+      }
+      function button(text, cls, fn) {
+        const b = el("button", cls, text);
+        b.type = "button";
+        b.addEventListener("click", fn);
+        return b;
+      }
+      function selected(d) {
+        return d.pick === -2
+          ? "Discuss first"
+          : d.pick === -1
+            ? d.answer
+            : d.options[d.pick]?.label || "Saved answer";
+      }
+      async function request(path, options) {
+        const r = await fetch(path, options);
+        const data = await r.json();
+        if (!r.ok) throw Error(data.error || "Request failed");
+        return data;
+      }
+      async function refresh() {
+        if (loading || busy) return;
+        loading = true;
+        $("refresh").disabled = true;
+        try {
+          state = await request("/api/state");
+          $("connection").textContent = "Connected";
+          $("updated").textContent =
+            "Updated " +
+            new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          $("city").textContent =
+            state.city + " · Local panel · Refreshes every 8 seconds";
+          $("error").textContent = "";
+          render();
+        } catch (e) {
+          $("connection").textContent = "Connection interrupted";
+          $("error").textContent =
+            e.message + "\nYour last view is kept. Refresh to try again.";
+        } finally {
+          loading = false;
+          $("refresh").disabled = false;
+        }
+      }
+      async function answer(pick, text = "") {
+        if (busy || !current) return;
+        let deliveryError = "";
+        busy = true;
+        $("decisions")
+          .querySelectorAll("button,input")
+          .forEach((n) => (n.disabled = true));
+        $("error").textContent = "";
+        try {
+          await request("/api/answer", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Decision-Token": token,
+            },
+            body: JSON.stringify({ id: current.id, pick, text }),
+          });
+          decisionSignature = "";
+        } catch (e) {
+          deliveryError =
+            e.message + "\nIf an answer was saved, use Retry delivery below.";
+          decisionSignature = "";
+        } finally {
+          busy = false;
+          await refresh();
+          if (deliveryError) $("error").textContent = deliveryError;
+          $("decisions")
+            .querySelectorAll("button,input")
+            .forEach((n) => (n.disabled = false));
+        }
+      }
+      function defer() {
+        if (!current || busy) return;
+        later = later.filter((id) => id !== current.id);
+        later.push(current.id);
+        try {
+          sessionStorage.setItem("later", JSON.stringify(later));
+        } catch {}
+        decisionSignature = "";
+        render();
+      }
+      function render() {
+        const ds = state.decisions.filter((d) => !d.delivered || !d.closed);
+        ds.sort((a, b) => {
+          const i = later.indexOf(a.id),
+            j = later.indexOf(b.id);
+          return (i < 0 ? -1 : i) - (j < 0 ? -1 : j);
+        });
+        current = ds[0] || null;
+        $("decision-count").textContent = ds.length
+          ? `· ${ds.length} waiting`
+          : "";
+        const sig = JSON.stringify(current);
+        if (sig !== decisionSignature) {
+          decisionSignature = sig;
+          const root = $("decisions");
+          root.replaceChildren();
+          if (!current) {
+            const n = el("div", "empty");
+            n.append(
+              el("strong", "", "You’re all caught up"),
+              el("span", "", "New decisions will appear here."),
+            );
+            root.append(n);
+          } else {
+            const d = current;
+            root.append(
+              el(
+                "div",
+                "eyebrow",
+                d.id + (d.sender ? " · from " + d.sender : ""),
+              ),
+              el("h3", "question", d.question),
+            );
+            if (d.context) root.append(el("p", "context", d.context));
+            if (d.pick !== null) {
+              const n = el("div", "saved");
+              n.append(
+                el("div", "", "Saved: " + selected(d)),
+                el(
+                  "div",
+                  "",
+                  d.delivered
+                    ? "Answer delivered. Finish closing this decision."
+                    : "Delivery needs to finish before this decision closes.",
+                ),
+                button(
+                  d.delivered ? "Finish decision" : "Retry delivery",
+                  "primary",
+                  () => answer(d.pick, d.answer || ""),
+                ),
+              );
+              root.append(n);
+            } else {
+              const opts = el("div", "options");
+              d.options.forEach((o, i) => {
+                const b = button(
+                    "",
+                    "option" + (i === d.recommended ? " recommended" : ""),
+                    () => answer(i),
+                  ),
+                  body = el("div");
+                b.append(el("span", "key", String(i + 1)));
+                body.append(el("strong", "", o.label));
+                if (i === d.recommended)
+                  body.append(el("span", "tag", "Recommended"));
+                if (o.detail) body.append(el("span", "detail", o.detail));
+                b.append(body);
+                opts.append(b);
+              });
+              root.append(opts);
+              const f = el("form", "custom"),
+                label = el("label", "", "Have another answer?");
+              label.htmlFor = "custom-answer";
+              const row = el("div", "input-row"),
+                input = el("input");
+              input.id = "custom-answer";
+              input.placeholder = "Write your answer";
+              input.maxLength = 10000;
+              input.required = true;
+              const send = el("button", "primary", "Send");
+              send.type = "submit";
+              row.append(input, send);
+              f.append(label, row);
+              f.addEventListener("submit", (e) => {
+                e.preventDefault();
+                if (input.value.trim()) answer(-1, input.value);
+              });
+              root.append(f);
+              const acts = el("div", "actions");
+              acts.append(button("Discuss first", "quiet", () => answer(-2)));
+              const laterButton = button("Later", "quiet", defer);
+              laterButton.id = "later-decision";
+              acts.append(laterButton);
+              root.append(acts);
+            }
+          }
+        }
+        const laterButton = $("later-decision");
+        if (laterButton) laterButton.disabled = ds.length < 2;
+        const ws = JSON.stringify(state.work);
+        if (ws !== workSignature) {
+          workSignature = ws;
+          renderWork();
+        }
+      }
+      function renderWork() {
+        const root = $("work");
+        root.replaceChildren();
+        const items = state.work,
+          counted = items.filter((w) => w.status !== "dropped"),
+          done = counted.filter((w) => w.status === "done").length,
+          pct = counted.length ? Math.round((done / counted.length) * 100) : 0;
+        $("work-count").textContent = items.length + " items";
+        const s = el("div", "summary");
+        s.append(
+          el("strong", "", pct + "%"),
+          el("span", "", done + " of " + counted.length + " done"),
+        );
+        const p = el("progress");
+        p.max = 100;
+        p.value = pct;
+        p.setAttribute("aria-label", `${done} of ${counted.length} tasks done`);
+        root.append(s, p);
+        if (!items.length)
+          root.append(el("div", "empty", "No work on the list yet."));
+        const active = items.filter(
+            (w) => !["done", "dropped"].includes(w.status),
+          ),
+          finished = items.filter((w) =>
+            ["done", "dropped"].includes(w.status),
+          );
+        groups(root, active);
+        if (finished.length) {
+          const details = el("details");
+          details.append(el("summary", "", `Finished · ${finished.length}`));
+          groups(details, finished);
+          root.append(details);
+        }
+      }
+      function groups(parent, items) {
+        const groups = new Map();
+        for (const w of items) {
+          if (!groups.has(w.group)) groups.set(w.group, []);
+          groups.get(w.group).push(w);
+        }
+        for (const [name, list] of groups) {
+          parent.append(el("h3", "", name));
+          list.sort(
+            (a, b) =>
+              (a.order ?? 1e9) - (b.order ?? 1e9) ||
+              (rank[a.status] ?? 9) - (rank[b.status] ?? 9),
+          );
+          for (const w of list) {
+            const row = el("div", "work-row"),
+              body = el("div"),
+              meta = el("div", "work-meta");
+            meta.append(
+              el("span", "", labels[w.status] || w.status),
+              el("code", "", w.key),
+            );
+            body.append(meta, el("div", "work-title", w.title));
+            if (w.note) body.append(el("div", "work-note", w.note));
+            if (w.who) body.append(el("div", "work-note", w.who));
+            row.append(
+              el(
+                "span",
+                "dot " + (Object.hasOwn(rank, w.status) ? w.status : "todo"),
+              ),
+              body,
+            );
+            parent.append(row);
+          }
+        }
+      }
+      $("refresh").addEventListener("click", refresh);
+      document.addEventListener("keydown", (e) => {
+        if (
+          e.ctrlKey ||
+          e.metaKey ||
+          e.altKey ||
+          e.repeat ||
+          /INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY/.test(e.target.tagName) ||
+          !current ||
+          busy
+        )
+          return;
+        if (current.pick !== null) return;
+        const k = e.key.toLowerCase();
+        if (/^[1-9]$/.test(k) && Number(k) <= current.options.length) {
+          e.preventDefault();
+          answer(Number(k) - 1);
+        } else if (k === "d") {
+          e.preventDefault();
+          answer(-2);
+        } else if (k === "l") {
+          e.preventDefault();
+          defer();
+        }
+      });
+      refresh();
+      setInterval(() => {
+        if (!document.hidden) refresh();
+      }, 8000);
+    </script>
+  </body>
+</html>
