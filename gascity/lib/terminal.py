@@ -10,6 +10,7 @@ import sys
 import textwrap
 import threading
 import time
+from typing import NamedTuple
 
 # Load the adjacent module explicitly so the pack's isolated Python launcher works.
 spec = importlib.util.spec_from_file_location('decision_panel_store', Path(__file__).with_name('panel.py'))
@@ -19,6 +20,12 @@ spec.loader.exec_module(panel)
 
 def plain(value):
     return ''.join(c for c in str(value) if c.isprintable() or c == '\n')
+
+
+class Row(NamedTuple):
+    text: str
+    style: str = 'text'
+    key: str = ''
 
 
 class View:
@@ -54,11 +61,16 @@ class View:
             self.editing = False
             self.scroll = 0
 
-    def handle(self, key):
+    def click(self, key):
+        return self.handle(key, pointer=True)
+
+    def handle(self, key, pointer=False):
         if self.sending:
             return None
+        if pointer:
+            key = {'send': '\n', 'cancel': '\x1b'}.get(key, key)
         d = self.current
-        if self.editing and d:
+        if self.editing and d and (not pointer or key in ('\n', '\x1b')):
             if key in ('\n', '\r', curses.KEY_ENTER):
                 if self.draft.strip():
                     return ('answer', d['id'], -1, self.draft.strip())
@@ -96,49 +108,58 @@ class View:
                 self.editing = True
             elif key == 'l' and len(self.pending) > 1:
                 self.later = [id for id in self.later if id != d['id']] + [d['id']]
+                self.editing = False
                 self.scroll = 0
         return None
 
     def lines(self, width):
+        return [row.text for row in self.rows(width)]
+
+    def rows(self, width):
         width = max(1, width)
         out = []
 
-        def add(value=''):
+        def add(value='', style='text', key=''):
             for line in plain(value).split('\n'):
-                out.extend(textwrap.wrap(line, width, replace_whitespace=True) or [''])
+                out.extend(Row(part, style, key) for part in
+                           (textwrap.wrap(line, width, replace_whitespace=True) or ['']))
 
         d = self.current
-        add(f'DECISIONS  |  {len(self.pending)} waiting')
-        add('-' * min(width, 48))
+        add(f'DECISIONS  |  {len(self.pending)} waiting', 'heading')
+        add('-' * min(width, 48), 'muted')
         if d:
-            add(d['id'] + (f"  from {d['sender']}" if d.get('sender') else ''))
+            add(d['id'] + (f"  from {d['sender']}" if d.get('sender') else ''), 'muted')
             add(d['question'])
             add()
             if d.get('context'):
-                add(d['context'])
+                add(d['context'], 'muted')
                 add()
             if d['pick'] is not None:
                 pick = d['pick']
                 label = ('Discuss first' if pick == -2 else d.get('answer', '') if pick == -1
                          else d['options'][pick]['label'])
-                add('Saved: ' + label)
-                add('[r] Finish delivery / close decision')
+                add('Saved: ' + label, 'waiting')
+                add('[r] Finish delivery / close decision', 'option', 'r')
             else:
                 for i, option in enumerate(d['options']):
                     rec = ' (recommended)' if i == d.get('recommended') else ''
-                    add(f"[{i+1}] {option['label']}{rec}")
+                    style = 'recommended' if rec else 'option'
+                    add(f"[{i+1}] {option['label']}{rec}", style, str(i+1))
                     if option.get('detail'):
-                        add('    ' + option['detail'])
+                        add('    ' + option['detail'], style, str(i+1))
                     add()
-                add('[e] Own answer  [d] Discuss  [l] Later')
+                add('[e] Own answer', 'option', 'e')
+                add('[d] Discuss first', 'option', 'd')
+                if len(self.pending) > 1:
+                    add('[l] Later', 'option', 'l')
         else:
-            add('All caught up. New decisions appear here.')
+            add('All caught up. New decisions appear here.', 'done')
         add()
         items = self.state['work']
         counted = [w for w in items if w['status'] != 'dropped']
         done = sum(w['status'] == 'done' for w in counted)
-        add(f'WORK  |  {done}/{len(counted)} done')
-        add('-' * min(width, 48))
+        add(f'WORK  |  {done}/{len(counted)} done', 'heading')
+        add('-' * min(width, 48), 'muted')
         if not items:
             add('No work on the list yet.')
         groups = {}
@@ -148,15 +169,43 @@ class View:
             groups.setdefault(w.get('group') or 'Today', []).append(w)
         order = {'running': 0, 'review': 1, 'waiting': 2, 'blocked': 3, 'todo': 4, 'done': 5, 'dropped': 6}
         for name, work in groups.items():
-            add(name)
+            add(name, 'heading')
             for w in sorted(work, key=lambda w: (w.get('order') if w.get('order') is not None else 1e9,
                                                 order.get(w['status'], 9))):
-                add(f"[{w['status']}] {w['key']}  {w['title']}")
+                add(f"[{w['status']}] {w['key']}  {w['title']}", w['status'])
                 if w.get('note'):
-                    add('  ' + w['note'])
+                    add('  ' + w['note'], 'muted')
                 add()
-        add('[w] ' + ('Hide' if self.show_done else 'Show') + ' finished work')
+        add('[w] ' + ('Hide' if self.show_done else 'Show') + ' finished work', 'option', 'w')
         return out
+
+
+def colors():
+    styles = {'heading': curses.A_BOLD, 'recommended': curses.A_BOLD,
+              'option': curses.A_BOLD, 'muted': curses.A_DIM, 'toolbar': curses.A_REVERSE}
+    if not curses.has_colors():
+        return styles
+    try:
+        curses.start_color()
+        background = curses.COLOR_BLACK
+        try:
+            curses.use_default_colors()
+            background = -1
+        except curses.error:
+            pass
+        roles = {'heading': curses.COLOR_CYAN, 'recommended': curses.COLOR_GREEN,
+                 'option': curses.COLOR_CYAN, 'running': curses.COLOR_CYAN,
+                 'review': curses.COLOR_MAGENTA, 'waiting': curses.COLOR_YELLOW,
+                 'blocked': curses.COLOR_RED, 'done': curses.COLOR_GREEN,
+                 'error': curses.COLOR_RED, 'input': curses.COLOR_YELLOW}
+        for pair, (role, foreground) in enumerate(roles.items(), 1):
+            if pair >= curses.COLOR_PAIRS:
+                break
+            curses.init_pair(pair, foreground, background)
+            styles[role] = curses.color_pair(pair) | curses.A_BOLD
+    except curses.error:
+        pass
+    return styles
 
 
 def run(screen, store):
@@ -165,6 +214,12 @@ def run(screen, store):
     except curses.error:
         pass
     screen.timeout(150)
+    styles = colors()
+    try:
+        curses.mousemask(curses.ALL_MOUSE_EVENTS)
+        curses.mouseinterval(0)
+    except curses.error:
+        pass
     view = View()
     requests, results = queue.Queue(), queue.Queue()
 
@@ -204,6 +259,7 @@ def run(screen, store):
             fetching = True
         height, width = screen.getmaxyx()
         screen.erase()
+        targets = []
 
         def draw(y, text, attr=0):
             if y < 0 or y >= height or width < 2:
@@ -213,28 +269,62 @@ def run(screen, store):
             except curses.error:
                 pass
 
+        def buttons(y, items):
+            x = 0
+            for label, key in items:
+                text = f'[{label}] '
+                if x >= width - 1:
+                    break
+                end = min(width - 1, x + len(text) - 1)
+                try:
+                    screen.addnstr(y, x, text, width - 1 - x, styles.get('toolbar', 0))
+                except curses.error:
+                    pass
+                targets.append((y, x, end, key))
+                x += len(text)
+
         if height < 8 or width < 20:
             draw(0, 'Enlarge pane (20x8 min). q quits')
         else:
-            body = view.lines(width - 1)
+            body = view.rows(width - 1)
             visible = height - 4
             view.scroll = min(view.scroll, max(0, len(body) - visible))
-            for y, line in enumerate(body[view.scroll:view.scroll + visible]):
-                draw(y, line, curses.A_BOLD if line.startswith(('DECISIONS ', 'WORK ')) else 0)
-            draw(height - 4, '-' * (width - 1))
-            draw(height - 3, view.error or ('Sending answer...' if view.sending else view.notice), curses.A_REVERSE)
+            for y, row in enumerate(body[view.scroll:view.scroll + visible]):
+                draw(y, row.text, styles.get(row.style, 0))
+                if row.key:
+                    targets.append((y, 0, width - 1, row.key))
+            draw(height - 4, '-' * (width - 1), styles.get('muted', 0))
+            draw(height - 3, view.error or ('Sending answer...' if view.sending else view.notice),
+                 styles.get('error', 0) if view.error else styles.get('muted', 0))
             if view.editing:
-                draw(height - 2, 'Answer > ' + view.draft[-max(1, width - 12):] + '_', curses.A_BOLD)
-                draw(height - 1, 'Enter sends | Esc cancels editing')
+                draw(height - 2, 'Answer > ' + view.draft[-max(1, width - 12):] + '_', styles.get('input', 0))
+                targets.append((height - 2, 0, width - 1, 'e'))
+                buttons(height - 1, [('Send', 'send'), ('Cancel', 'cancel')])
             else:
-                draw(height - 2, '1-9 choose | e write | d discuss | l later')
-                draw(height - 1, 'j/k scroll | r refresh/retry | w done | q quit')
+                buttons(height - 2, [('e Write', 'e'), ('d Discuss', 'd'), ('l Later', 'l')])
+                buttons(height - 1, [('Up', 'k'), ('Down', 'j'), ('r Refresh', 'r'), ('w Done', 'w'), ('q Quit', 'q')])
         screen.refresh()
         try:
             key = screen.get_wch()
         except curses.error:
             continue
-        action = view.handle(key)
+        if key == curses.KEY_MOUSE:
+            try:
+                _, x, y, _, flags = curses.getmouse()
+            except curses.error:
+                continue
+            if flags & curses.BUTTON4_PRESSED:
+                view.scroll = max(0, view.scroll - 3)
+                continue
+            if flags & getattr(curses, 'BUTTON5_PRESSED', 0):
+                view.scroll += 3
+                continue
+            if not flags & (curses.BUTTON1_CLICKED | curses.BUTTON1_PRESSED):
+                continue
+            target = next((key for row, start, end, key in targets if row == y and start <= x < end), None)
+            action = view.click(target) if target else None
+        else:
+            action = view.handle(key)
         if not action:
             continue
         if action[0] == 'quit':

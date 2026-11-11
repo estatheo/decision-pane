@@ -65,6 +65,36 @@ class TerminalTests(unittest.TestCase):
         self.view.sending = False
         self.assertEqual(self.view.handle('q'), ('quit',))
 
+    def test_clicking_an_option_while_editing_chooses_instead_of_typing(self):
+        self.view.handle('e')
+        self.view.handle('A')
+        self.assertEqual(self.view.click('2'), ('answer', 'one', 1, ''))
+        self.assertEqual(self.view.draft, 'A')
+        self.view.sending = True
+        self.assertIsNone(self.view.click('1'))
+
+    def test_clickable_custom_send_cancel_and_work_controls(self):
+        self.view.click('e')
+        self.view.handle('A')
+        self.view.click('w')
+        self.assertTrue(self.view.editing)
+        self.assertTrue(self.view.show_done)
+        self.assertEqual(self.view.click('send'), ('answer', 'one', -1, 'A'))
+        self.view.click('cancel')
+        self.assertFalse(self.view.editing)
+        self.assertEqual(self.view.draft, 'A')
+
+    def test_wrapped_options_keep_click_targets_and_recommended_style(self):
+        d = decision()
+        d['recommended'] = 1
+        d['options'][1] = {'label': 'A longer second option that wraps', 'detail': 'More details'}
+        self.view.update({'decisions': [d], 'work': []})
+        rows = self.view.rows(18)
+        choices = [row for row in rows if row.key == '2']
+        self.assertGreater(len(choices), 1)
+        self.assertTrue(all(row.style == 'recommended' for row in choices))
+        self.assertTrue(all(len(row.text) <= 18 for row in rows))
+
 
 if __name__ == '__main__':
     unittest.main()

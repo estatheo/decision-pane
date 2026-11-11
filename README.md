@@ -78,6 +78,25 @@ retry saved delivery, and `q` to exit the panel. Sending disables further
 submissions and waits for delivery before accepting `q`. The panel scrolls to
 fit narrow or short panes and requires at least 20 columns by 8 rows.
 
+The option rows and bracketed controls are clickable, including wrapped option
+details, custom-answer Send/Cancel, refresh, scrolling and finished-work controls.
+Use the clickable Up/Down controls to scroll. Wheel support depends on the
+terminal's curses build; older macOS builds do not expose wheel-down events.
+Colors distinguish headings, recommendations and work states; terminals without
+color retain bold labels and plain status text.
+
+To click between tmux panes and drag their divider left/right, enable mouse mode
+for your session (replace `mayor` with your session name):
+
+```bash
+tmux set-option -t mayor mouse on
+```
+
+Drag the vertical border to adjust panel width. Keyboard resizing also works:
+`Ctrl-b` then `:` opens tmux's command prompt; enter `resize-pane -L 5` or
+`resize-pane -R 5` while the panel is selected. These settings do not change the
+global tmux configuration.
+
 Once your pinned pack includes this version, `gc decisions terminal` also works.
 This runs a separate terminal process beside Codex; it does not modify Codex,
 start a model, restart the city, or change global tmux settings. The browser
