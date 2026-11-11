@@ -47,13 +47,13 @@ You need Claude Code with mods (function hooks), version 2.1.300 or later.
 In a Claude Code session, type:
 
 ```
-/plugin install decisions --marketplace estatheo/claude-decisions
+/plugin install decisions --marketplace estatheo/decision-pane
 ```
 
 Press `y` to add the marketplace, then pick a scope (just you, or this project). Or from a shell:
 
 ```bash
-claude plugin install decisions --marketplace estatheo/claude-decisions
+claude plugin install decisions --marketplace estatheo/decision-pane
 ```
 
 That's it. Start a new session and Claude has the tools.
@@ -61,11 +61,11 @@ That's it. Start a new session and Claude has the tools.
 ### Run it from a local copy
 
 ```bash
-git clone https://github.com/estatheo/claude-decisions
-claude --plugin-dir ./claude-decisions
+git clone https://github.com/estatheo/decision-pane
+claude --plugin-dir ./decision-pane
 ```
 
-To load it in every session, set `CLAUDE_CODE_PLUGIN_DIRS=/path/to/claude-decisions` in your shell or in the `env` block of `~/.claude/settings.json`.
+To load it in every session, set `CLAUDE_CODE_PLUGIN_DIRS=/path/to/decision-pane` in your shell or in the `env` block of `~/.claude/settings.json`.
 
 ## Gas City (any model, GPT included)
 
@@ -84,7 +84,7 @@ Three steps, run once per city:
 
 ```bash
 cd /path/to/your-city
-gc import add https://github.com/estatheo/claude-decisions/tree/main/gascity --name decisions
+gc import add https://github.com/estatheo/decision-pane/tree/main/gascity --name decisions
 ```
 
 That adds `gc decisions ask`, `work`, `list` and `withdraw` (`--name` sets the `decisions` in those commands). They need `python3` on the machine.
