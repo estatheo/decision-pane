@@ -1,11 +1,15 @@
 {
   "name": "estatheo",
-  "owner": { "name": "estatheo", "url": "https://github.com/estatheo" },
+  "owner": {
+    "name": "estatheo",
+    "url": "https://github.com/estatheo"
+  },
   "plugins": [
     {
       "name": "decisions",
       "source": "./",
-      "description": "A Decisions panel and a Work of the day list beside the Claude Code chat."
+      "description": "A Decisions panel and a Work of the day list beside the Claude Code chat. Works with Gas City agents on any model through beads."
     }
-  ]
+  ],
+  "description": "Claude Code mods by estatheo"
 }

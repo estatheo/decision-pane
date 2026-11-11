@@ -8,11 +8,15 @@ export type Decision = {
   options: DecisionOption[]
   recommended?: number
   postedAt: string
-  /** The option's index, or -1 for a written answer. Absent while open. */
+  /** The option's index, -1 for a written answer, -2 for discuss first. Absent while open. */
   pick?: number
   answer?: string
   answeredAt?: string
   isDelivered?: boolean
+  /** Beads store: who gets the answer by gc mail. */
+  replyTo?: string
+  /** Beads store: posted by Claude in this panel, so the answer goes to this session. */
+  viaPanel?: boolean
 }
 
 export type WorkStatus = 'todo' | 'running' | 'waiting' | 'review' | 'blocked' | 'done' | 'dropped'
@@ -20,6 +24,8 @@ export type WorkStatus = 'todo' | 'running' | 'waiting' | 'review' | 'blocked' |
 export type WorkItem = {
   /** Jira key when there is one (ABC-123), else a short id. */
   key: string
+  /** Beads store: the bead holding this item. */
+  bead?: string
   title: string
   status: WorkStatus
   /** One line on where it stands now. */

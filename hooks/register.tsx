@@ -24,6 +24,151 @@ async function storeKey($: any, base: string): Promise<string> {
 }
 const KEEP_ANSWERED = 40
 
+// ---------------------------------------------------------------------------
+// Beads store (store = "beads"): decisions and work items live in the Gas City
+// city's beads, so agents on any model post with `gc decisions ask` and answers
+// go back to them by gc mail. The atoms below stay the panel's copy, refreshed
+// from beads every few seconds and after every write.
+// ---------------------------------------------------------------------------
+let useBeads = false
+let gcPath = ''
+let gcBin: string | undefined
+// Decisions the person pushed back with "Later", shown after the others.
+const later: string[] = []
+
+async function gc($: any, args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
+  const tries = gcBin ? [gcBin] : [gcPath || 'gc', `${(await $.env.get('HOME').catch(() => '')) || ''}/.local/bin/gc`]
+  let last = { ok: false, out: '', err: 'gc not found' }
+  for (const bin of tries) {
+    try {
+      const r = await $.process.run([bin, ...args], { timeoutMs: 20000 })
+      last = { ok: r.exitCode === 0, out: String(r.stdout ?? ''), err: String(r.stderr ?? '') }
+      gcBin = bin
+      return last
+    } catch (err) {
+      last = { ok: false, out: '', err: String(err) }
+    }
+  }
+  return last
+}
+
+async function bd($: any, args: string[]): Promise<string> {
+  const r = await gc($, ['bd', ...args])
+  if (!r.ok) throw new Error(`gc bd ${args[0]}: ${r.err.trim().split('\n').pop() ?? 'failed'}`)
+  return r.out
+}
+
+async function bdList($: any, args: string[]): Promise<any[]> {
+  const out = await bd($, ['list', '--json', '--limit', '0', ...args])
+  const i = out.indexOf('[')
+  if (i < 0) return []
+  try {
+    return JSON.parse(out.slice(i))
+  } catch {
+    return []
+  }
+}
+
+function dayOffset(days: number): string {
+  return new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
+}
+
+function beadToDecision(b: any): Decision | undefined {
+  const m = b.metadata ?? {}
+  if (m.withdrawn) return undefined
+  if (b.status === 'closed' && m.pick === undefined) return undefined
+  return {
+    id: b.id,
+    question: String(b.title ?? ''),
+    context: b.description ? String(b.description) : undefined,
+    from: m.from || b.created_by || undefined,
+    options: Array.isArray(m.options) ? m.options : [],
+    recommended: Number.isInteger(m.recommended) ? m.recommended : undefined,
+    postedAt: String(b.created_at ?? ''),
+    pick: Number.isInteger(m.pick) ? m.pick : undefined,
+    answer: m.answer,
+    answeredAt: m.answered_at,
+    isDelivered: !!m.delivered,
+    replyTo: m.reply_to || b.created_by || undefined,
+    viaPanel: !!m.via_panel,
+  }
+}
+
+function beadToWork(b: any): WorkItem | undefined {
+  const m = b.metadata ?? {}
+  if (m.removed) return undefined
+  return {
+    key: String(m.key ?? b.id),
+    bead: b.id,
+    title: String(b.title ?? ''),
+    status: STATUSES.includes(m.status) ? m.status : b.status === 'closed' ? 'done' : 'todo',
+    note: m.note,
+    who: m.who,
+    link: m.link,
+    group: m.group,
+    order: typeof m.order === 'number' ? m.order : undefined,
+    due: m.due,
+    day: String(m.day ?? String(b.created_at ?? '').slice(0, 10)),
+    updatedAt: String(b.updated_at ?? ''),
+  }
+}
+
+// Refreshes run one after another, so one asked for after a write always reads it.
+let refreshing: Promise<void> = Promise.resolve()
+async function refresh($: any): Promise<void> {
+  if (!useBeads) return
+  refreshing = refreshing.then(async () => {
+    try {
+      const open = await bdList($, ['--label-any', 'decision,work'])
+      const recent = await bdList($, ['--label-any', 'decision,work', '--all', '--updated-after', dayOffset(-1)])
+      const byId = new Map<string, any>()
+      for (const b of [...open, ...recent]) byId.set(b.id, b)
+      const all = [...byId.values()].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+      const has = (b: any, l: string) => Array.isArray(b.labels) && b.labels.includes(l)
+      let ds = all.filter(b => has(b, 'decision')).map(beadToDecision).filter(Boolean) as Decision[]
+      ds = [...ds.filter(d => !later.includes(d.id)), ...later.map(id => ds.find(d => d.id === id)).filter(Boolean) as Decision[]]
+      const ws = all.filter(b => has(b, 'work')).map(beadToWork).filter(Boolean) as WorkItem[]
+      await update($, decisions, () => trimAnswered(ds))
+      await update($, work, () => ws)
+      const n = ds.filter(isOpen).length
+      $.ui.status(n ? `${n} decision${n === 1 ? '' : 's'} waiting · /decisions` : undefined)
+    } catch (err) {
+      $.ui.status(`decisions: can't read beads (${String((err as any)?.message ?? err).slice(0, 80)})`)
+    }
+  })
+  return refreshing
+}
+
+async function beadsPost($: any, d: Omit<Decision, 'id' | 'postedAt'>): Promise<string> {
+  const meta = { kind: 'decision', options: d.options, recommended: d.recommended, from: d.from, via_panel: true }
+  const out = await bd($, [
+    'create', d.question, '--labels', 'decision', '--description', d.context ?? '', '--allow-empty-description',
+    '--metadata', JSON.stringify(meta), '--silent',
+  ])
+  return out.trim().split('\n').pop() ?? '?'
+}
+
+async function beadsWork($: any, r: any, now: WorkItem | undefined): Promise<'ok' | 'missing'> {
+  const status = STATUSES.includes(r?.status) ? (r.status as WorkStatus) : undefined
+  const fields: Record<string, unknown> = {}
+  for (const k of ['note', 'who', 'link', 'group', 'due']) if (r?.[k] !== undefined) fields[k] = String(r[k])
+  if (typeof r?.order === 'number') fields.order = r.order
+  if (status) fields.status = status
+  let id = now?.bead
+  if (id) {
+    const args = ['update', id, '--metadata', JSON.stringify(fields)]
+    if (r?.title) args.push('--title', String(r.title))
+    await bd($, args)
+  } else {
+    if (!r?.title) return 'missing'
+    const meta = { kind: 'work', key: String(r.key), status: status ?? 'todo', day: today(), ...fields }
+    const out = await bd($, ['create', String(r.title), '--labels', 'work', '--allow-empty-description', '--metadata', JSON.stringify(meta), '--silent'])
+    id = out.trim().split('\n').pop()
+  }
+  if (id && status && (status === 'done' || status === 'dropped')) await bd($, ['close', id, '--reason', status])
+  return 'ok'
+}
+
 // Bump the tag when Decision's fields change: it declines what an older
 // version stored, which outlives a reload.
 const decisions = atom({ plugin: 'decisions', key: 'list' } as const, [], {
@@ -85,7 +230,7 @@ const WORK_LIST_TOOL = 'mcp__decisions__work_list'
 const WORK_REMOVE_TOOL = 'mcp__decisions__work_remove'
 // The Atlassian MCP server's transition tool, under the names it gets when added
 // as a local server or as the claude.ai connector.
-const JIRA_TRANSITION_TOOLS = ['mcp__atlassian__transitionJiraIssue', 'mcp__claude_ai_Atlassian_MCP__transitionJiraIssue']
+const JIRA_TRANSITION_TOOL = /^mcp__(atlassian|claude_ai_Atlassian_MCP)__transitionJiraIssue$/
 
 const STATUSES: WorkStatus[] = ['todo', 'running', 'waiting', 'review', 'blocked', 'done', 'dropped']
 const ORDER: Record<WorkStatus, number> = { running: 0, review: 1, waiting: 2, blocked: 3, todo: 4, done: 5, dropped: 6 }
@@ -120,6 +265,7 @@ function visibleWork(list: WorkItem[]): WorkItem[] {
 }
 
 async function saveWork($: any, list: WorkItem[]): Promise<void> {
+  if (useBeads) return
   try {
     await $.store.set(await storeKey($, WORK_STORE_KEY), list)
   } catch {
@@ -191,7 +337,7 @@ function deliveryText(d: Decision): string {
   if (d.from) lines.push(`Raised by: ${d.from}`)
   lines.push(
     d.pick === -2
-      ? 'Ask them about it in chat; do not act on it yet.'
+      ? 'Ask them about it in chat (or by gc mail); do not act on it yet.'
       : 'Act on it now. Do not ask them again.',
   )
   return lines.join('\n')
@@ -211,6 +357,7 @@ function summarise(list: Decision[]): string {
 }
 
 async function save($: any, list: Decision[]): Promise<void> {
+  if (useBeads) return
   try {
     await $.store.set(await storeKey($, STORE_KEY), list)
   } catch {
@@ -241,6 +388,25 @@ async function answer($: any, id: string, pick: number, text?: string): Promise<
   )
   if (!picked) return
   const d = picked
+  if (useBeads) {
+    try {
+      const reason = d.pick === -1 ? 'answered in own words' : d.pick === -2 ? 'discuss first' : `answered: ${d.options[d.pick ?? 0]?.label ?? ''}`
+      await bd($, ['update', d.id, '--metadata', JSON.stringify({ pick, answer: text, answered_at: d.answeredAt })])
+      await bd($, ['close', d.id, '--reason', reason])
+      if (!d.viaPanel && d.replyTo) {
+        const subject = deliveryText(d).split('\n')[0]!
+        const r = await gc($, ['mail', 'send', d.replyTo, '-s', subject, '-m', deliveryText(d), '--notify'])
+        if (!r.ok) throw new Error(r.err)
+      } else {
+        await $.prompt.submit({ text: deliveryText(d) })
+      }
+      await bd($, ['update', d.id, '--metadata', JSON.stringify({ delivered: true })])
+    } catch {
+      $.ui.toast(`Couldn't send ${d.id}; the answer is saved on the bead.`)
+    }
+    await refresh($)
+    return
+  }
   try {
     await $.prompt.submit({ text: deliveryText(d) })
     await change($, list => list.map(x => (x.id === d.id ? { ...x, isDelivered: true } : x)))
@@ -261,7 +427,9 @@ function cleanOptions(raw: unknown): DecisionOption[] {
     .slice(0, 9)
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  useBeads = (options as any)?.store === 'beads'
+  gcPath = String((options as any)?.gcPath ?? '')
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'decisions',
@@ -376,10 +544,15 @@ export const register: Register = on => {
     })
     // Load this project's lists.
     const load = async (base: string) => await $.store.get(await storeKey($, base)).catch(() => undefined)
-    const w = (await load(WORK_STORE_KEY)) as WorkItem[] | undefined
-    await changeWork($, () => (Array.isArray(w) ? w : []))
-    const stored = (await load(STORE_KEY)) as Decision[] | undefined
-    await change($, () => (Array.isArray(stored) ? stored : []))
+    if (useBeads) {
+      await refresh($)
+      $.clock.every(8000, () => refresh($))
+    } else {
+      const w = (await load(WORK_STORE_KEY)) as WorkItem[] | undefined
+      await changeWork($, () => (Array.isArray(w) ? w : []))
+      const stored = (await load(STORE_KEY)) as Decision[] | undefined
+      await change($, () => (Array.isArray(stored) ? stored : []))
+    }
     const now = (await read($, decisions)) ?? []
     if (now.some(isOpen)) void $.ui.open({ id: PANE, title: 'Decisions' })
 
@@ -396,7 +569,20 @@ export const register: Register = on => {
     const raw = (e as any).decisions
     if (!Array.isArray(raw) || raw.length === 0) return { deny: 'decisions must be a non-empty array.' }
     const ids: string[] = []
-    await change($, list => {
+    if (useBeads) {
+      for (const r of raw) {
+        const options = cleanOptions(r?.options)
+        const question = String(r?.question ?? '').trim()
+        if (!question || options.length < 2) continue
+        const rec = Number.isInteger(r?.recommended) && r.recommended >= 0 && r.recommended < options.length ? r.recommended : undefined
+        try {
+          ids.push(await beadsPost($, { question, options, recommended: rec, context: r?.context ? String(r.context) : undefined, from: r?.from ? String(r.from) : undefined }))
+        } catch (err) {
+          return { deny: `Couldn't write the decision to beads: ${String((err as any)?.message ?? err)}` }
+        }
+      }
+      await refresh($)
+    } else await change($, list => {
       const out = [...list]
       for (const r of raw) {
         const options = cleanOptions(r?.options)
@@ -426,11 +612,20 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: LIST_TOOL }, async $ => {
+    await refresh($)
     return { result: summarise((await read($, decisions)) ?? []) } as any
   })
 
   on('tool.call', { tool: WITHDRAW_TOOL }, async ($, e) => {
-    const ids = new Set(((e as any).ids ?? []).map(String))
+    const ids = new Set<string>(((e as any).ids ?? []).map(String))
+    if (useBeads) {
+      for (const id of ids) {
+        await bd($, ['update', id, '--metadata', JSON.stringify({ withdrawn: true })]).catch(() => '')
+        await bd($, ['close', id, '--reason', 'withdrawn']).catch(() => '')
+      }
+      await refresh($)
+      return { result: `Withdrawn. ${summarise((await read($, decisions)) ?? [])}` } as any
+    }
     const after = await change($, list => list.filter(d => !(isOpen(d) && ids.has(d.id))))
     return { result: `Withdrawn. ${summarise(after)}` } as any
   })
@@ -440,6 +635,22 @@ export const register: Register = on => {
     if (!Array.isArray(raw) || raw.length === 0) return { deny: 'items must be a non-empty array.' }
     const now = new Date().toISOString()
     const missing: string[] = []
+    if (useBeads) {
+      await refresh($)
+      const list = (await read($, work)) ?? []
+      try {
+        for (const r of raw) {
+          const key = String(r?.key ?? '').trim()
+          if (!key) continue
+          if ((await beadsWork($, { ...r, key }, list.find(w => w.key === key))) === 'missing') missing.push(key)
+        }
+      } catch (err) {
+        return { deny: `Couldn't write to beads: ${String((err as any)?.message ?? err)}` }
+      }
+      await refresh($)
+      const warn = missing.length ? `\nNot added (no title given for a new item): ${missing.join(', ')}` : ''
+      return { result: summariseWork((await read($, work)) ?? []) + warn } as any
+    }
     const after = await changeWork($, list => {
       const out = [...list]
       for (const r of raw) {
@@ -484,17 +695,26 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: WORK_LIST_TOOL }, async $ => {
+    await refresh($)
     return { result: summariseWork((await read($, work)) ?? []) } as any
   })
 
   on('tool.call', { tool: WORK_REMOVE_TOOL }, async ($, e) => {
     const keys = new Set(((e as any).keys ?? []).map(String))
+    if (useBeads) {
+      for (const w of ((await read($, work)) ?? []).filter(w => keys.has(w.key) && w.bead)) {
+        await bd($, ['update', w.bead!, '--metadata', JSON.stringify({ removed: true })]).catch(() => '')
+        await bd($, ['close', w.bead!, '--reason', 'removed']).catch(() => '')
+      }
+      await refresh($)
+      return { result: summariseWork((await read($, work)) ?? []) } as any
+    }
     const after = await changeWork($, list => list.filter(w => !keys.has(w.key)))
     return { result: summariseWork(after) } as any
   })
 
   // A Jira transition of a key on the list moves the list item too.
-  for (const tool of JIRA_TRANSITION_TOOLS) on('tool.call', { tool }, async ($, e, next) => {
+  on('tool.call', { tool: JIRA_TRANSITION_TOOL }, async ($, e, next) => {
     const ran = await next(e)
     try {
       const key = String((e as any).issueIdOrKey ?? '').toUpperCase()
@@ -503,7 +723,11 @@ export const register: Register = on => {
       const status = m ? statusFromJira(m[1]!) : undefined
       if (key && status) {
         const list = (await read($, work)) ?? []
-        if (list.some(w => w.key.toUpperCase() === key)) {
+        const hit = list.find(w => w.key.toUpperCase() === key)
+        if (hit && useBeads) {
+          await beadsWork($, { key: hit.key, status, note: status === 'done' ? `Jira: ${m![1]}` : undefined }, hit)
+          await refresh($)
+        } else if (hit) {
           await changeWork($, l =>
             l.map(w =>
               w.key.toUpperCase() === key
@@ -734,12 +958,17 @@ export const register: Register = on => {
                 plain
                 dimColor
                 label="Later"
-                onPress={() =>
+                onPress={() => {
+                  if (useBeads) {
+                    const i = later.indexOf(cur.id)
+                    if (i >= 0) later.splice(i, 1)
+                    later.push(cur.id)
+                  }
                   void change($, l => {
                     const me = l.find(d => d.id === cur.id)
                     return me ? [...l.filter(d => d.id !== cur.id), me] : l
                   })
-                }
+                }}
               />
             )}
           </Box>

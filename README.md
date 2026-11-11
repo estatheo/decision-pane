@@ -38,6 +38,7 @@ It also keeps a **Work of the day** list in the same panel, so you can see what 
 - **See the day at a glance.** The work list shows each item as working, to merge, waiting, blocked, to do, done or dropped, with a progress bar for the day and for each group.
 - **It survives restarts.** Open decisions and the work list are kept per project. Finished items from earlier days drop off by themselves.
 - **Jira stays in step.** If you use the Atlassian MCP server, moving a ticket that is on the list moves the list item too.
+- **Works with Gas City agents on any model.** Agents running on GPT (Codex) or anything else post with `gc decisions ask` and get your answer back by `gc mail`. See [Gas City](#gas-city-any-model-gpt-included).
 
 ## Install
 
@@ -65,6 +66,56 @@ claude --plugin-dir ./claude-decisions
 ```
 
 To load it in every session, set `CLAUDE_CODE_PLUGIN_DIRS=/path/to/claude-decisions` in your shell or in the `env` block of `~/.claude/settings.json`.
+
+## Gas City (any model, GPT included)
+
+In a [Gas City](https://github.com/gastownhall/gascity) the decisions and the work list can live in the city's beads instead of one Claude Code session. Then every agent in the city posts to your panel, whichever model runs it, and each answer goes back to the agent that asked, by `gc mail`, with a wake-up if it is asleep.
+
+```
+ GPT / Codex agent ──gc decisions ask──┐
+ Claude agent ─────mcp__decisions__post┼──▶ city beads ──▶ your Decisions panel
+ any agent ────────gc decisions work───┘                        │ you press 1
+                       ◀── gc mail "DECISION hq-4f2: ..." ──────┘
+```
+
+Three steps, run once per city:
+
+**1. Give the agents the commands.** Import the pack from this repo into the city:
+
+```bash
+cd /path/to/your-city
+gc import add https://github.com/estatheo/claude-decisions/tree/main/gascity
+```
+
+That adds `gc decisions ask`, `work`, `list` and `withdraw`. They need `python3` on the machine.
+
+**2. Tell every agent to use them.** Add the pack's prompt fragment to `city.toml`:
+
+```toml
+[workspace]
+global_fragments = ["decisions"]   # keep your existing entries in the list
+```
+
+**3. Point your panel at the city.** Install the mod in the Claude Code session where you work (see [Install](#install)), then set its store to beads, in `/config` or in `~/.claude/settings.json`:
+
+```json
+{ "pluginConfigs": { "decisions@estatheo": { "options": { "store": "beads" } } } }
+```
+
+Start that session inside the city folder so `gc` finds the city. If `gc` is not on your `PATH`, set `gcPath` too. If the city has no Claude Code session at all, you can still answer from the command line with `gc decisions list` and `gc bd`; the panel itself needs Claude Code.
+
+What agents run:
+
+```bash
+gc decisions ask "Merge the auth refactor now or after the release?" \
+  --context "Tests pass. The release branch is cut on Friday." \
+  --option "Merge now :: lands in this release" --option "Wait for the release" --recommend 1
+
+gc decisions work API-212 --title "Rate limits on the public API" --status running --note "writing docs"
+gc decisions work API-212 --status review
+```
+
+Decisions are beads labelled `decision` and work items beads labelled `work`, with the details in the bead's metadata, so they also show in `gc bd list` and the Gas City dashboard.
 
 ## Use
 
@@ -111,7 +162,12 @@ Act on it now. Do not ask them again.
 
 ## How it works
 
-It is a single hooks module (`hooks/register.tsx`) using the Claude Code mods API: it registers the six tools and the `/decisions` command, draws the pane, and submits each answer as a prompt. State is kept in the session and saved to the mod store, keyed by the session's folder, so each project has its own decisions and work list. Nothing leaves your machine.
+It is a single hooks module (`hooks/register.tsx`) using the Claude Code mods API: it registers the six tools and the `/decisions` command, draws the pane, and submits each answer as a prompt.
+
+- **local store (the default):** state is saved to the Claude Code mod store, keyed by the session's folder, so each project has its own decisions and work list.
+- **beads store:** the panel reads the city's beads every few seconds through `gc bd`, writes answers back to the bead, and sends them by `gc mail` to the agent that asked. The `gascity/` folder is a Gas City pack with the `gc decisions` commands (`gascity/lib/decisions.py`, standard library only) and the agents' prompt fragment.
+
+Nothing leaves your machine.
 
 ## Contributing
 
@@ -119,6 +175,7 @@ Issues and pull requests are welcome. Check a change with:
 
 ```bash
 claude plugin validate .
+gc lint gascity
 ```
 
 ## License
