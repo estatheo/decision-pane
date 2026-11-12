@@ -95,6 +95,35 @@ class TerminalTests(unittest.TestCase):
         self.assertTrue(all(row.style == 'recommended' for row in choices))
         self.assertTrue(all(len(row.text) <= 18 for row in rows))
 
+    def test_progress_segments_fill_width_and_exclude_dropped(self):
+        items = [{'status': status} for status in ['done', 'done', 'review', 'running',
+            'waiting', 'blocked', 'todo', 'dropped']]
+        result = terminal.progress(items, 21)
+        self.assertEqual((result.done, result.total, result.percent), (2, 7, 29))
+        self.assertEqual(result.segments, (('done', '█'*6), ('review', '█'*3),
+            ('running', '█'*3), ('waiting', '█'*3), ('blocked', '█'*3), ('todo', '░'*3)))
+        self.assertEqual(sum(len(text) for _, text in result.segments), 21)
+
+    def test_empty_and_narrow_progress_keep_their_requested_width(self):
+        empty = terminal.progress([], 9)
+        self.assertEqual((empty.percent, empty.total), (0, 0))
+        self.assertEqual(empty.segments, (('todo', '░'*9),))
+        narrow = terminal.progress([{'status': 'done'}, {'status': 'review'}, {'status':'todo'}], 2)
+        self.assertEqual(sum(len(text) for _, text in narrow.segments), 2)
+
+    def test_overall_and_group_progress_include_hidden_done_rows(self):
+        items = [dict(key=str(i), title='Work', status=status, group='Build')
+                 for i, status in enumerate(['done', 'review', 'running', 'dropped'])]
+        self.view.update({'decisions': [], 'work': items})
+        rows = self.view.rows(26)
+        text = '\n'.join(row.text for row in rows)
+        self.assertIn('1/3 done', text)
+        self.assertIn('33%', text)
+        self.assertIn('Build', text)
+        self.assertNotIn('[done]', text)
+        self.assertEqual(len([row for row in rows if row.spans and '█' in row.text]), 2)
+        self.assertTrue(all(len(row.text) <= 26 for row in rows))
+
 
 if __name__ == '__main__':
     unittest.main()

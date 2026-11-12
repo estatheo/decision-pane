@@ -26,6 +26,32 @@ class Row(NamedTuple):
     text: str
     style: str = 'text'
     key: str = ''
+    spans: tuple = ()
+
+
+STATUSES = ('done', 'review', 'running', 'waiting', 'blocked', 'todo')
+
+
+class Progress(NamedTuple):
+    done: int
+    total: int
+    percent: int
+    segments: tuple
+
+
+def progress(items, width):
+    counts = {status: sum(w['status'] == status for w in items) for status in STATUSES}
+    total = sum(counts.values())
+    if not total:
+        return Progress(0, 0, 0, (('todo', '░' * width),))
+    segments, cumulative, drawn = [], 0, 0
+    for status in STATUSES:
+        cumulative += counts[status]
+        end = int(cumulative * width / total + 0.5)
+        if end > drawn:
+            segments.append((status, ('░' if status == 'todo' else '█') * (end - drawn)))
+        drawn = end
+    return Progress(counts['done'], total, int(counts['done'] * 100 / total + 0.5), tuple(segments))
 
 
 class View:
@@ -124,6 +150,29 @@ class View:
                 out.extend(Row(part, style, key) for part in
                            (textwrap.wrap(line, width, replace_whitespace=True) or ['']))
 
+        def add_bar(items):
+            result = progress(items, min(40, width))
+            out.append(Row(''.join(text for _, text in result.segments), spans=result.segments))
+            return result
+
+        def add_legend(items):
+            spans, length = [], 0
+            for status in STATUSES:
+                count = sum(w['status'] == status for w in items)
+                if not count:
+                    continue
+                text = f'{status} {count}  '
+                if spans and length + len(text.rstrip()) > width:
+                    out.append(Row(''.join(part for _, part in spans).rstrip(), spans=tuple(spans)))
+                    spans, length = [], 0
+                if len(text.rstrip()) > width:
+                    add(text, status)
+                else:
+                    spans.append((status, text))
+                    length += len(text)
+            if spans:
+                out.append(Row(''.join(part for _, part in spans).rstrip(), spans=tuple(spans)))
+
         d = self.current
         add(f'DECISIONS  |  {len(self.pending)} waiting', 'heading')
         add('-' * min(width, 48), 'muted')
@@ -156,22 +205,25 @@ class View:
             add('All caught up. New decisions appear here.', 'done')
         add()
         items = self.state['work']
-        counted = [w for w in items if w['status'] != 'dropped']
-        done = sum(w['status'] == 'done' for w in counted)
-        add(f'WORK  |  {done}/{len(counted)} done', 'heading')
-        add('-' * min(width, 48), 'muted')
+        overall = progress(items, min(40, width))
+        add(f'WORK  |  {overall.done}/{overall.total} done  {overall.percent}%', 'heading')
+        add_bar(items)
+        add_legend(items)
+        add()
         if not items:
             add('No work on the list yet.')
         groups = {}
         for w in items:
-            if not self.show_done and w['status'] in ('done', 'dropped'):
-                continue
             groups.setdefault(w.get('group') or 'Today', []).append(w)
         order = {'running': 0, 'review': 1, 'waiting': 2, 'blocked': 3, 'todo': 4, 'done': 5, 'dropped': 6}
         for name, work in groups.items():
-            add(name, 'heading')
+            group = progress(work, min(40, width))
+            add(f'{name}  |  {group.done}/{group.total} done  {group.percent}%', 'heading')
+            add_bar(work)
             for w in sorted(work, key=lambda w: (w.get('order') if w.get('order') is not None else 1e9,
                                                 order.get(w['status'], 9))):
+                if not self.show_done and w['status'] in ('done', 'dropped'):
+                    continue
                 add(f"[{w['status']}] {w['key']}  {w['title']}", w['status'])
                 if w.get('note'):
                     add('  ' + w['note'], 'muted')
@@ -291,6 +343,15 @@ def run(screen, store):
             view.scroll = min(view.scroll, max(0, len(body) - visible))
             for y, row in enumerate(body[view.scroll:view.scroll + visible]):
                 draw(y, row.text, styles.get(row.style, 0))
+                x = 0
+                for style, text in row.spans:
+                    if x >= width - 1:
+                        break
+                    try:
+                        screen.addnstr(y, x, text, width - 1 - x, styles.get(style, 0))
+                    except curses.error:
+                        pass
+                    x += len(text)
                 if row.key:
                     targets.append((y, 0, width - 1, row.key))
             draw(height - 4, '-' * (width - 1), styles.get('muted', 0))

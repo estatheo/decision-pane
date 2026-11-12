@@ -85,6 +85,11 @@ terminal's curses build; older macOS builds do not expose wheel-down events.
 Colors distinguish headings, recommendations and work states; terminals without
 color retain bold labels and plain status text.
 
+Overall and per-group progress show a percentage and a segmented bar, with a
+status legend. Segments follow the Claude pane: green done, magenta review,
+cyan running, yellow waiting, red blocked, and shaded to-do. Dropped items do
+not count toward completion; hiding finished rows does not change the totals.
+
 To click between tmux panes and drag their divider left/right, enable mouse mode
 for your session (replace `mayor` with your session name):
 
