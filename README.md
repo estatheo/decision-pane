@@ -1,4 +1,113 @@
-# Decisions panel for Claude Code
+# Decisions panel for Gas City and Claude Code
+
+**Using Codex?** Run the local browser panel below. It uses the same Gas City
+decisions and work list as the Claude Code pane, without starting another model.
+The docked `/decisions` pane remains a Claude Code integration; the browser panel
+does not add a native sidebar inside Codex.
+
+## Local panel for Codex and other agents
+
+Requires Python 3.9+ and Gas City (`gc`) on your PATH. From a checkout of this
+repository, run:
+
+```bash
+python3 gascity/lib/panel.py --city /absolute/path/to/your-city
+```
+
+It prints a localhost URL and opens your browser. Keep that process running;
+Ctrl-C stops it. Use `--no-open` to print the URL only, or `--port 8765` for a
+fixed port. No Python packages, API key, paid service or model session is needed.
+
+When the city's pinned decisions pack includes this version, you can also run
+`gc decisions panel` from inside the city. Existing pins must be updated through
+your normal pack upgrade process; do not edit Gas City's imported cache.
+
+The panel shows pending decisions, recommendations, option details, a custom
+answer field, **Discuss first**, **Later**, and grouped work progress. Keys
+`1`–`9`, `D` and `L` work when focus is outside a form control. It refreshes every
+eight seconds while visible and preserves an answer being typed. Later only
+changes this browser tab's queue; it does not answer or withdraw anything.
+
+Answers are saved to the original bead and sent to its `reply_to` agent through
+`gc mail send --notify`. If delivery fails, the saved choice stays visible with
+**Retry delivery**. A saved answer cannot be replaced with another choice.
+Repeat submissions skip already delivered answers; retries also use Gas City's
+mail deduplication key (best effort if the configured mail provider lacks dedup
+support). Decisions created only for a Claude session need a `reply_to` recipient
+before the browser panel can deliver them. Use one answering interface per city
+at a time; simultaneous submissions from the Claude pane and browser are not an
+atomic cross-client operation.
+
+The server binds only to `127.0.0.1`, checks Host/Origin, and requires a per-run
+token for answers. It does not expose a shell or an arbitrary command endpoint.
+Do not expose it through a tunnel or reverse proxy. This is a local interface,
+not a multi-user hosted service. If Gas City is unavailable, the last view stays
+on screen with an error; no empty successful state is substituted.
+
+To check the browser panel and its answer-delivery contract:
+
+```bash
+python3 -m unittest discover -s tests -v
+node tests/panel-ui.cjs  # optional UI regression check; Node 18+
+gc lint gascity
+```
+
+## Terminal panel beside Codex
+
+On macOS or Linux, the terminal panel uses Python's standard-library `curses`
+and the same city beads and delivery code as the browser panel:
+
+```bash
+python3 gascity/lib/terminal.py --city /absolute/path/to/your-city
+```
+
+Inside a tmux session, run this from your Codex pane to add a 58-column panel
+on the right while keeping focus in Codex. Replace both paths with your checkout
+and city paths:
+
+```bash
+tmux split-window -h -d -l 58 'python3 -I /path/to/decision-pane/gascity/lib/terminal.py --city /path/to/city'
+```
+
+With tmux's default prefix, `Ctrl-b` then `o` switches panes. In the panel,
+`1`–`9` chooses, `e` starts a custom answer, `d` asks to discuss first, and `l`
+defers a decision. While editing, all printable keys become answer text;
+Enter sends and Escape leaves editing. Polling preserves unfinished answers.
+Use `j`/`k` or arrows to scroll, `w` to show finished work, `r` to refresh or
+retry saved delivery, and `q` to exit the panel. Sending disables further
+submissions and waits for delivery before accepting `q`. The panel scrolls to
+fit narrow or short panes and requires at least 20 columns by 8 rows.
+
+The option rows and bracketed controls are clickable, including wrapped option
+details, custom-answer Send/Cancel, refresh, scrolling and finished-work controls.
+Use the clickable Up/Down controls to scroll. Wheel support depends on the
+terminal's curses build; older macOS builds do not expose wheel-down events.
+Colors distinguish headings, recommendations and work states; terminals without
+color retain bold labels and plain status text.
+
+Overall and per-group progress show a percentage and a segmented bar, with a
+status legend. Segments follow the Claude pane: green done, magenta review,
+cyan running, yellow waiting, red blocked, and shaded to-do. Dropped items do
+not count toward completion; hiding finished rows does not change the totals.
+
+To click between tmux panes and drag their divider left/right, enable mouse mode
+for your session (replace `mayor` with your session name):
+
+```bash
+tmux set-option -t mayor mouse on
+```
+
+Drag the vertical border to adjust panel width. Keyboard resizing also works:
+`Ctrl-b` then `:` opens tmux's command prompt; enter `resize-pane -L 5` or
+`resize-pane -R 5` while the panel is selected. These settings do not change the
+global tmux configuration.
+
+Once your pinned pack includes this version, `gc decisions terminal` also works.
+This runs a separate terminal process beside Codex; it does not modify Codex,
+start a model, restart the city, or change global tmux settings. The browser
+panel can stay open as a view; use one interface at a time to answer a decision.
+
+## Claude Code pane
 
 Stop answering Claude's questions in the chat. With this mod, Claude puts every choice it needs from you in a panel beside the chat and keeps working. You answer with one keypress when you are ready, and the answer goes straight back to Claude.
 
@@ -102,7 +211,7 @@ global_fragments = ["decisions"]   # keep your existing entries in the list
 { "pluginConfigs": { "decisions@estatheo": { "options": { "store": "beads" } } } }
 ```
 
-Start that session inside the city folder so `gc` finds the city. If `gc` is not on your `PATH`, set `gcPath` too. If the city has no Claude Code session at all, you can still answer from the command line with `gc decisions list` and `gc bd`; the panel itself needs Claude Code.
+Start that session inside the city folder so `gc` finds the city. If `gc` is not on your `PATH`, set `gcPath` too. If the city has no Claude Code session, use the local browser panel above. The docked terminal pane itself needs Claude Code.
 
 What agents run:
 
